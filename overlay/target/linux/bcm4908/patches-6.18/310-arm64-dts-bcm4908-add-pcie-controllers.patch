@@ -1,0 +1,103 @@
+From: OpenWrt community
+Subject: arm64: dts: broadcom: bcm4908: add PCIe controllers
+
+--- a/arch/arm64/boot/dts/broadcom/bcmbca/bcm4908.dtsi	2026-10-22 16:00:17
++++ b/arch/arm64/boot/dts/broadcom/bcmbca/bcm4908.dtsi	2026-10-22 15:59:53
+@@ -323,7 +323,87 @@
+ 		};
+ 	};
+ 
+-	/* PERF Peripherals */
++
++	/*
++	 * PCIe controllers (BCA). PCIE0/1/2 at 0x80040000..0x80060000, each
++	 * with its own MMIO window, MSI controller, PMB power domain and
++	 * perst reset line. Boards enable the ones they populate.
++	 */
++	pcie0: pcie@80040000 {
++		compatible = "brcm,bcm4908-pcie";
++		reg = <0x0 0x80040000 0x0 0xa000>;
++		device_type = "pci";
++		#address-cells = <3>;
++		#size-cells = <2>;
++		#interrupt-cells = <1>;
++		interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "pcie", "msi";
++		interrupt-map-mask = <0x0 0x0 0x0 0x7>;
++		interrupt-map = <0 0 0 1 &gic GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 0 2 &gic GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 0 3 &gic GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 0 4 &gic GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
++		msi-controller;
++		msi-parent = <&pcie0>;
++		power-domains = <&pmb BCM_PMB_PCIE0>;
++		ranges = <0x02000000 0x0 0xc0000000  0x0 0xc0000000  0x0 0x10000000>;
++		dma-ranges = <0x42000000 0x0 0x00000000  0x0 0x00000000  0x0 0x20000000>;
++		resets = <&pcie_reset 0>;
++		reset-names = "perst";
++		status = "disabled";
++	};
++
++	pcie1: pcie@80050000 {
++		compatible = "brcm,bcm4908-pcie";
++		reg = <0x0 0x80050000 0x0 0xa000>;
++		device_type = "pci";
++		#address-cells = <3>;
++		#size-cells = <2>;
++		#interrupt-cells = <1>;
++		interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "pcie", "msi";
++		interrupt-map-mask = <0x0 0x0 0x0 0x7>;
++		interrupt-map = <0 0 0 1 &gic GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 0 2 &gic GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 0 3 &gic GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 0 4 &gic GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
++		msi-controller;
++		msi-parent = <&pcie1>;
++		power-domains = <&pmb BCM_PMB_PCIE1>;
++		ranges = <0x02000000 0x0 0xd0000000  0x0 0xd0000000  0x0 0x10000000>;
++		dma-ranges = <0x42000000 0x0 0x00000000  0x0 0x00000000  0x0 0x20000000>;
++		resets = <&pcie_reset 1>;
++		reset-names = "perst";
++		status = "disabled";
++	};
++
++	pcie2: pcie@80060000 {
++		compatible = "brcm,bcm4908-pcie";
++		reg = <0x0 0x80060000 0x0 0xa000>;
++		device_type = "pci";
++		#address-cells = <3>;
++		#size-cells = <2>;
++		#interrupt-cells = <1>;
++		interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "pcie", "msi";
++		interrupt-map-mask = <0x0 0x0 0x0 0x7>;
++		interrupt-map = <0 0 0 1 &gic GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 0 2 &gic GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 0 3 &gic GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 0 4 &gic GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
++		msi-controller;
++		msi-parent = <&pcie2>;
++		power-domains = <&pmb BCM_PMB_PCIE2>;
++		ranges = <0x02000000 0x0 0xe0000000  0x0 0xe0000000  0x0 0x10000000>;
++		dma-ranges = <0x42000000 0x0 0x00000000  0x0 0x00000000  0x0 0x20000000>;
++		resets = <&pcie_reset 2>;
++		reset-names = "perst";
++		status = "disabled";
++	};
++
+ 	bus@ff800000 {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -727,7 +807,7 @@
+ 			#size-cells = <1>;
+ 			ranges = <0x00 0x2600 0xe4>;
+ 
+-			reset-controller@2644 {
++			pcie_reset: reset-controller@2644 {
+ 				compatible = "brcm,bcm4908-misc-pcie-reset";
+ 				reg = <0x44 0x04>;
+ 				#reset-cells = <1>;

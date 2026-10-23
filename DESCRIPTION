@@ -1,0 +1,2 @@
+Unofficial OpenWrt port for the Linksys EA9300 (BCM4908) router:
+PCIe, 3x BCM4366 WiFi with per-unit caldata, DSA switch, USB3, dual-slot boot.

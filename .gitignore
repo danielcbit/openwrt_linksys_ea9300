@@ -1,0 +1,14 @@
+# vendor binaries, per-unit data and build artifacts are never committed
+openwrt/
+stock/
+extracted/
+output/
+tftp/
+research/
+*.img
+*.bin
+*.ubi
+*.tar.gz
+*.log
+.DS_Store
+cferam.*

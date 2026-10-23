@@ -1,0 +1,73 @@
+From: OpenWrt community
+Subject: PCI: brcmstb: fixes needed for BCM4908 endpoints (UBUS inbound + INTR1 unmask)
+
+--- a/drivers/pci/controller/pcie-brcmstb.c	2026-10-22 16:00:37
++++ b/drivers/pci/controller/pcie-brcmstb.c	2026-10-22 16:00:27
+@@ -149,6 +149,16 @@
+ 
+ #define PCIE_MSI_INTR2_BASE		0x4500
+ 
++/*
++ * CPU L1 interrupt controller (bcm4908 / bcmbca).  Every PCIe interrupt
++ * source is masked out of reset here, so nothing the core raises reaches the
++ * GIC until the relevant bit is cleared in the mask-clear register.
++ */
++#define PCIE_CPU_INTR1_MASK_CLR			0x940c
++#define  PCIE_CPU_INTR1_PCIE_INTX_MASK		GENMASK(4, 1)
++#define  PCIE_CPU_INTR1_PCIE_INTR_MASK		BIT(5)
++#define  PCIE_CPU_INTR1_PCIE_MSI_MASK		BIT(9)
++
+ /* Offsets from INTR2_CPU and MSI_INTR2 BASE offsets */
+ #define  MSI_INT_STATUS			0x0
+ #define  MSI_INT_CLR			0x8
+@@ -1056,8 +1066,15 @@
+ 		 *     Do nothing.
+ 		 * 7712:
+ 		 *     All of their BARs need to be set.
++		 * 4908:
++		 *     The UBUS bridge gates inbound (device to host) access
++		 *     separately from the RC BAR. Without ACCESS_EN set on
++		 *     the UBUS remap register endpoint DMA into system
++		 *     memory never reaches DRAM (link training and config
++		 *     space work fine with the gate shut).
+ 		 */
+-		if (pcie->cfg->soc_base == BCM7712) {
++		if (pcie->cfg->soc_base == BCM7712 ||
++		    (pcie->cfg->soc_base == BCM4908 && size)) {
+ 			/* BUS remap register settings */
+ 			reg_offset = brcm_ubus_reg_offset(i);
+ 			tmp = lower_32_bits(cpu_addr) & ~0xfff;
+@@ -1069,6 +1086,24 @@
+ 	}
+ }
+ 
++/*
++ * On bcm4908 the PCIe core sits behind a CPU L1 interrupt controller whose
++ * mask register comes up with every source masked. Broadcom's own bcm963xx
++ * host driver clears the legacy INTA-INTD bits during core init; the MSI
++ * aggregate has its own bit which must be cleared too, or the MSI stays
++ * latched in the core forever and the chained handler is never entered.
++ */
++static void brcm_pcie_unmask_cpu_intr1(struct brcm_pcie *pcie)
++{
++	if (pcie->cfg->soc_base != BCM4908)
++		return;
++
++	writel_relaxed(PCIE_CPU_INTR1_PCIE_INTX_MASK |
++		       PCIE_CPU_INTR1_PCIE_INTR_MASK |
++		       PCIE_CPU_INTR1_PCIE_MSI_MASK,
++		       pcie->base + PCIE_CPU_INTR1_MASK_CLR);
++}
++
+ static int brcm_pcie_setup(struct brcm_pcie *pcie)
+ {
+ 	struct inbound_win inbound_wins[PCIE_BRCM_MAX_INBOUND_WINS];
+@@ -1249,6 +1284,8 @@
+ 	u32p_replace_bits(&tmp, PCIE_RC_CFG_VENDOR_SPECIFIC_REG1_LITTLE_ENDIAN,
+ 		PCIE_RC_CFG_VENDOR_VENDOR_SPECIFIC_REG1_ENDIAN_MODE_BAR2_MASK);
+ 	writel(tmp, base + PCIE_RC_CFG_VENDOR_VENDOR_SPECIFIC_REG1);
++
++	brcm_pcie_unmask_cpu_intr1(pcie);
+ 
+ 	if (pcie->cfg->post_setup) {
+ 		ret = pcie->cfg->post_setup(pcie);

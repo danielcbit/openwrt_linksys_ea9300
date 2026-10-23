@@ -1,0 +1,177 @@
+From: OpenWrt community
+Subject: arm64: dts: broadcom: bcm4908: add Linksys EA9300
+
+--- a2/arch/arm64/boot/dts/broadcom/bcmbca/Makefile	2026-10-22 16:01:05
++++ b2/arch/arm64/boot/dts/broadcom/bcmbca/Makefile	2026-10-22 16:01:05
+@@ -4,6 +4,7 @@
+ 				bcm4906-tplink-archer-c2300-v1.dtb \
+ 				bcm4906-zyxel-ex3510b.dtb \
+ 				bcm4908-asus-gt-ac5300.dtb \
++				bcm4908-linksys-ea9300.dtb \
+ 				bcm4908-netgear-raxe500.dtb \
+ 				bcm94908.dtb \
+ 				bcm4912-asus-gt-ax6000.dtb \
+
+--- /dev/null	2026-10-22 20:17:59
++++ b2/arch/arm64/boot/dts/broadcom/bcmbca/bcm4908-linksys-ea9300.dts	2026-10-22 20:17:41
+@@ -0,0 +1,160 @@
++// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/leds/common.h>
++
++#include "bcm4908.dtsi"
++
++/ {
++	compatible = "linksys,ea9300", "brcm,bcm4908", "brcm,bcmbca";
++	model = "Linksys EA9300 (Max-Stream AC4000 Tri-Band)";
++
++	memory@0 {
++		device_type = "memory";
++		reg = <0x00 0x00 0x00 0x20000000>;
++	};
++
++	gpio-keys-polled {
++		compatible = "gpio-keys-polled";
++		poll-interval = <100>;
++
++		key-wps {
++			label = "WPS";
++			linux,code = <KEY_WPS_BUTTON>;
++			gpios = <&gpio0 29 GPIO_ACTIVE_LOW>;
++		};
++
++		key-restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&gpio0 30 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	/*
++	 * TODO: LED GPIOs are not known yet (stock bdutil LED module data
++	 * not extracted). Extend once identified on hardware.
++	 */
++};
++
++&usb_phy {
++	brcm,ioc = <1>;
++	status = "okay";
++};
++
++&ehci {
++	status = "okay";
++};
++
++&ohci {
++	status = "okay";
++};
++
++&xhci {
++	status = "okay";
++};
++
++&ports {
++	port@0 {
++		label = "lan1";
++	};
++
++	port@1 {
++		label = "lan2";
++	};
++
++	port@2 {
++		label = "lan3";
++	};
++
++	port@3 {
++		label = "lan4";
++	};
++
++	port@7 {
++		reg = <7>;
++		phy-mode = "internal";
++		phy-handle = <&phy12>;
++		label = "wan";
++	};
++};
++
++/* BCM4365E radios: 2x 5 GHz + 1x 2.4 GHz, 3x3 802.11ac */
++&pcie0 {
++	status = "okay";
++};
++
++&pcie1 {
++	status = "okay";
++};
++
++&pcie2 {
++	status = "okay";
++};
++
++&nand_controller {
++	brcm,wp-not-connected;
++	status = "okay";
++};
++
++&nandcs {
++	nand-ecc-strength = <4>;
++	nand-ecc-step-size = <512>;
++	nand-on-flash-bbt;
++
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	/*
++	 * Fixed layout as created by the stock firmware (verified from a
++	 * real unit's /proc/mtd). Two firmware slots, active one is picked
++	 * at boot by CFE; the kernel's ofpart bcm4908 post-parse selects
++	 * the OpenWrt one ("1-openwrt" bootfs marker).
++	 */
++	partitions {
++		compatible = "brcm,bcm4908-partitions";
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		partition@0 {
++			label = "nvram";
++			reg = <0x0 0x100000>;
++		};
++
++		partition@100000 {
++			compatible = "brcm,bcm4908-firmware";
++			reg = <0x100000 0x4f80000>;
++		};
++
++		partition@5080000 {
++			compatible = "brcm,bcm4908-firmware";
++			reg = <0x5080000 0x4f80000>;
++		};
++
++		partition@a000000 {
++			label = "devinfo";
++			reg = <0xa000000 0x800000>;
++		};
++
++		partition@a800000 {
++			label = "sysdiag";
++			reg = <0xa800000 0x200000>;
++		};
++
++		partition@aa00000 {
++			label = "syscfg";
++			reg = <0xaa00000 0x4c00000>;
++		};
++
++		partition@f600000 {
++			label = "crash";
++			reg = <0xf600000 0x100000>;
++		};
++
++		partition@f700000 {
++			label = "data";
++			reg = <0xf700000 0x800000>;
++		};
++	};
++};

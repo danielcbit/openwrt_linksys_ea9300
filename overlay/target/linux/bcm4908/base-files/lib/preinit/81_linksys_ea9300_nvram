@@ -1,0 +1,60 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0 OR BSD-2-Clause
+#
+# Refreshes the brcmfmac NVRAM file for the Linksys EA9300 from the
+# unit's "devinfo" flash partition (Broadcom key=value factory store:
+# devpath0/1/2 entries + per-radio srom blocks keyed "N:"), which also
+# carries the per-unit MAC addresses, PA calibration and regulatory
+# settings.
+#
+# A static copy of this unit's data ships in the image
+# (/lib/firmware/brcm/brcmfmac4366c-pcie.linksys,ea9300.txt); this hook
+# keeps it in sync with the partition (e.g. after a factory-data change
+# or when building for a different unit). Fails soft throughout.
+
+linksys_ea9300_nvram() {
+	local nvram_file="/lib/firmware/brcm/brcmfmac4366c-pcie.linksys,ea9300.txt"
+
+	[ "$(board_name)" = "linksys,ea9300" ] || return 0
+
+	local mtdnum mtddev part
+	for part in devinfo nvram; do
+		mtdnum="$(find_mtd_index $part)"
+		[ -n "$mtdnum" ] && break
+	done
+	[ -n "$mtdnum" ] || return 0
+	mtddev="/dev/mtd$mtdnum"
+	[ -e "$mtddev" ] || return 0
+
+	# Broadcom NVRAM format: NUL separated "key=value" strings.
+	tr '\0' '\n' < "$mtddev" 2>/dev/null | sed -e '/^$/d' > /tmp/nvram_raw || return 0
+
+	[ -s /tmp/nvram_raw ] || {
+		rm -f /tmp/nvram_raw
+		return 0
+	}
+
+	# Keep only keys the wireless driver and board description use.
+	awk -F= '
+		/^(devpath[0-9]+|[0-9]+:|et0macaddr|boardnum|boardtype|boardflags|boardrev)/ { print }
+	' /tmp/nvram_raw > "$nvram_file.new" || {
+		rm -f /tmp/nvram_raw "$nvram_file.new"
+		return 0
+	}
+	rm -f /tmp/nvram_raw
+
+	# Only replace when the parsed data looks like this board's factory
+	# store (has devpath entries), otherwise keep the shipped file.
+	grep -q "^devpath" "$nvram_file.new" || {
+		rm -f "$nvram_file.new"
+		return 0
+	}
+
+	if cmp -s "$nvram_file.new" "$nvram_file"; then
+		rm -f "$nvram_file.new"
+	else
+		mv "$nvram_file.new" "$nvram_file"
+	fi
+}
+
+boot_hook_add preinit_main linksys_ea9300_nvram
