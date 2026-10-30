@@ -1,0 +1,106 @@
+# EA9300 LEDs. The generic /etc/init.d/led races the LED driver probe and
+# uses legacy sysfs attributes, so install a small rc.local hook that runs
+# once the LED class devices appear.
+#
+# Rear ports (BCM4908 LED engine): green = link, amber = tx/rx.
+# Front panel (engine channels on the same pins as the stock GPIOs):
+#   ethernet:amber  on while the WAN link is up (stock: wan_normal/wan_error)
+#   internet:amber  on while the internet is reachable; 2 successful checks
+#                   are needed to turn it on and 3 consecutive failures to
+#                   turn it off, so brief packet loss does not flicker it
+#                   (stock: internet_normal/internet_error)
+#                   Both icons are single-colour amber LEDs - there is no
+#                   white die (verified at every brightness level).
+#   wps:white/amber idle off (blink white while WPS is running would need
+#                   hostapd event hooks)
+#   logo:white      solid on
+#   usb1:green / usb2:green  on while a USB device is present
+[ "$(board_name)" = "linksys,ea9300" ] || exit 0
+
+cat > /etc/rc.local <<'EOS'
+# Put your custom commands here that should be executed once
+# the system init finished. By default this file does nothing.
+
+# EA9300 LEDs
+(
+	i=0
+	while [ $i -lt 30 ] && [ ! -e /sys/class/leds/lan1:green ]; do
+		sleep 1
+		i=$((i + 1))
+	done
+
+	# rear ports: netdev triggers
+	for p in lan1 lan2 lan3 lan4 wan; do
+		g=/sys/class/leds/$p:green
+		a=/sys/class/leds/$p:amber
+		[ -d "$g" ] && {
+			echo netdev > $g/trigger
+			echo $p > $g/device_name
+			echo 1 > $g/link
+		}
+		[ -d "$a" ] && {
+			echo netdev > $a/trigger
+			echo $p > $a/device_name
+			echo 1 > $a/tx
+			echo 1 > $a/rx
+		}
+	done
+
+	# front panel static states
+	echo 9 > /sys/class/leds/logo:white/brightness 2>/dev/null
+	echo 0 > /sys/class/leds/wps:white/brightness 2>/dev/null
+	echo 0 > /sys/class/leds/wps:amber/brightness 2>/dev/null
+
+	# front panel dynamic states
+	net=0; c_ok=0; c_fail=0
+	while :; do
+		if [ "$(cat /sys/class/net/wan/carrier 2>/dev/null)" = "1" ]; then
+			echo 9 > /sys/class/leds/ethernet:amber/brightness 2>/dev/null
+		else
+			echo 0 > /sys/class/leds/ethernet:amber/brightness 2>/dev/null
+		fi
+
+		ok=0
+		if wget -q -T 4 -O /dev/null http://connectivitycheck.gstatic.com/generate_204 2>/dev/null; then
+			ok=1
+		elif wget -q -T 4 -O /dev/null http://cp.cloudflare.com/generate_204 2>/dev/null; then
+			ok=1
+		elif nslookup openwrt.org >/dev/null 2>&1; then
+			ok=1
+		fi
+		if [ "$ok" = "1" ]; then
+			c_ok=$((c_ok + 1)); c_fail=0
+			[ "$c_ok" -ge 2 ] && net=1
+		else
+			c_fail=$((c_fail + 1)); c_ok=0
+			[ "$c_fail" -ge 3 ] && net=0
+		fi
+		if [ "$net" = "1" ]; then
+			echo 9 > /sys/class/leds/internet:amber/brightness 2>/dev/null
+		else
+			echo 0 > /sys/class/leds/internet:amber/brightness 2>/dev/null
+		fi
+
+		cnt=0
+		for d in /sys/bus/usb/devices/*-*; do
+			[ -e "$d/idVendor" ] && cnt=$((cnt + 1))
+		done
+		if [ $cnt -gt 0 ]; then
+			u=9
+		else
+			u=0
+		fi
+		for l in usb1:green usb2:green; do
+			echo $u > /sys/class/leds/$l/brightness 2>/dev/null
+		done
+		sleep 5
+	done
+) &
+
+exit 0
+EOS
+
+# ensure the rc.local service is enabled
+[ -x /etc/init.d/rc.local ] && /etc/init.d/rc.local enable
+
+exit 0
