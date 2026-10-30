@@ -1,0 +1,23 @@
+# EA9300: fixed non-DFS channels avoid unreliable ACS scans and long
+# discovery delays on the BCM43666 radios. Defaults are open networks so a
+# freshly flashed unit is reachable without a preset key.
+[ "$(board_name)" = "linksys,ea9300" ] || exit 0
+for r in radio0 radio1 radio2; do
+	uci -q set wireless.$r.country=CA
+	uci -q delete wireless.$r.txpower
+done
+uci -q set wireless.radio0.channel=6
+uci -q set wireless.radio0.htmode=HT20
+uci -q set wireless.radio1.channel=36
+uci -q set wireless.radio1.htmode=HT20
+uci -q set wireless.radio2.channel=48
+uci -q set wireless.radio2.htmode=HT20
+for r in default_radio0 default_radio1 default_radio2; do
+	uci -q set wireless.$r.disabled=0
+	uci -q set wireless.$r.encryption=none
+	uci -q delete wireless.$r.key
+done
+uci -q set wireless.default_radio0.ssid=OpenWRT-2.4
+uci -q set wireless.default_radio1.ssid=OpenWRT-5-1
+uci -q set wireless.default_radio2.ssid=OpenWRT-5-2
+uci -q commit wireless
