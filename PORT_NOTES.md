@@ -88,8 +88,14 @@ country.
 - `scripts/fetch-wifi-firmware.sh` downloads a hash-pinned 2021 build
   (10.10.122.303, FWID 01-ccd91e51, from codeberg.org/floe/
   broadcom-4366c-firmware) that has the CLM and works with brcmfmac 6.x.
-  With it all three radios come up (5-2 on 149, 5-1 on 48, 2.4 on 6) and
+  With it all three radios come up (5-2 on 149, 5-1 on 36/40, 2.4 on 6) and
   DHCP/data traffic works on both bands.
+
+VHT80: the factory regulatory (Q2/906) caps the 5 GHz width at 40 MHz with
+that firmware. The preinit hook rewrites `ccode`/`regrev` to US/0, which
+keeps the same FCC channels (36-48, 149-161) and additionally allows 80 MHz.
+Defaults are VHT80 on both 5 GHz radios (non-DFS centre channels 42 and
+155) and HT20 on 2.4 GHz.
 
 ## Known open items
 

@@ -34,6 +34,13 @@ linksys_ea9300_nvram() {
 		}
 	' > "$nvram_file.new" 2>/dev/null
 
+	# The factory regulatory (Q2/906) caps the 5 GHz width at 40 MHz with
+	# the current firmware build. US/0 keeps the same FCC channel set
+	# (36-48, 149-161) and additionally allows VHT80.
+	sed -i -e 's#^\(pcie/[0-9]*/1/\)ccode=.*#\1ccode=US#' \
+	       -e 's#^\(pcie/[0-9]*/1/\)regrev=.*#\1regrev=0#' \
+	       "$nvram_file.new" 2>/dev/null
+
 	# Require all three mapped radio blocks.
 	for domain in 1 2 3; do
 		[ "$(grep -c "^pcie/$domain/1/" "$nvram_file.new" 2>/dev/null)" -ge 100 ] || {
