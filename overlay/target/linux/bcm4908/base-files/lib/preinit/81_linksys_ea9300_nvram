@@ -3,9 +3,15 @@
 # Generate brcmfmac v2-format NVRAM (pcie/<domain+1>/1/<key>) for the
 # Linksys EA9300 from the per-unit factory data in the "devinfo" partition.
 #
-# Factory block 1 is the 2.4 GHz radio. The two 5 GHz factory blocks are
-# reversed relative to Linux PCI order: block 3 serves domain 1; block 2
-# serves domain 2. brcmfmac reserves NVRAM domain 0, hence domain+1 keys.
+# Radio assignment recovered from the stock syscfg (wl*_mac_addr and
+# wl*_available_channels) - the three cores are dual-band capable but the
+# RF path of each is band-specific:
+#   block 1 = wl0, MAC ...BD, 2.4 GHz        -> Linux phy1
+#   block 2 = wl1, MAC ...BE, 5 GHz  36-48   -> Linux phy2
+#   block 3 = wl2, MAC ...BF, 5 GHz 149-165  -> Linux phy0
+# brcmfmac reserves NVRAM domain 0, so its keys are pcie/<linux-domain+1>/1/:
+#   block 3 -> pcie/1/1/ (phy0), block 1 -> pcie/2/1/ (phy1),
+#   block 2 -> pcie/3/1/ (phy2).
 
 linksys_ea9300_nvram() {
 	local nvram_file="/lib/firmware/brcm/brcmfmac4366c-pcie.linksys,ea9300.txt"
@@ -19,12 +25,12 @@ linksys_ea9300_nvram() {
 		/^[0-9]+:/ {
 			n = substr($0, 1, 1) + 0
 			sub(/^[0-9]+:/, "")
-			if (n == 1)
+			if (n == 3)
 				print "pcie/1/1/" $0
+			else if (n == 1)
+				print "pcie/2/1/" $0
 			else if (n == 2)
 				print "pcie/3/1/" $0
-			else if (n == 3)
-				print "pcie/2/1/" $0
 		}
 	' > "$nvram_file.new" 2>/dev/null
 

@@ -51,6 +51,13 @@ if [ -n "$EA9300_CALDATA" ] && [ -f "$EA9300_CALDATA" ]; then
 	echo "baked caldata from $EA9300_CALDATA"
 fi
 
+# 4b. BCM4366C0 firmware with full-channel CLM data. The linux-firmware
+#     build refuses UNII-3 (149-165), which disables the high-band 5 GHz
+#     radio; the stock Linksys dhd build has the CLM but is too old for
+#     brcmfmac 6.x. fetch-wifi-firmware.sh downloads a hash-pinned 2021
+#     build that works.
+"$SCRIPT_DIR/fetch-wifi-firmware.sh" "$OUT_DIR/files/lib/firmware/brcm"
+
 cd "$OUT_DIR"
 
 # 5. feeds + config

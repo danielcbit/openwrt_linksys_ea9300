@@ -37,9 +37,9 @@ tr '\0' '\n' < "$FILE" 2>/dev/null | awk -F= '
 	/^[0-9]+:/ {
 		n = substr($1, 1, 1) + 0
 		sub(/^[0-9]+:/, "")
-		if (n == 1) print "pcie/1/1/" $0
+		if (n == 3) print "pcie/1/1/" $0
+		else if (n == 1) print "pcie/2/1/" $0
 		else if (n == 2) print "pcie/3/1/" $0
-		else if (n == 3) print "pcie/2/1/" $0
 		next
 	}
 	/^(et0macaddr|boardnum|boardtype|boardflags|boardrev)/ { print }

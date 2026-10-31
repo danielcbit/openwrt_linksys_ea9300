@@ -1,15 +1,28 @@
 # EA9300: fixed non-DFS channels avoid unreliable ACS scans and long
 # discovery delays on the BCM43666 radios. Defaults are open networks so a
 # freshly flashed unit is reachable without a preset key.
+#
+# Radio <-> band mapping is NOT the PCI enumeration order. All three
+# BCM4366 cores are dual-band capable, but each has a band-specific RF
+# path, per the stock firmware's syscfg:
+#   wl0 2.4 GHz        (MAC ...BD) -> Linux phy1 / radio1
+#   wl1 5 GHz  36-48   (MAC ...BE) -> Linux phy2 / radio2
+#   wl2 5 GHz 149-165  (MAC ...BF) -> Linux phy0 / radio0 (needs CLM)
+# radio0 can only transmit 149-165; that works because the image ships a
+# BCM4366C0 firmware with full CLM data (see scripts/fetch-wifi-firmware.sh).
 [ "$(board_name)" = "linksys,ea9300" ] || exit 0
 for r in radio0 radio1 radio2; do
 	uci -q set wireless.$r.country=CA
 	uci -q delete wireless.$r.txpower
 done
-uci -q set wireless.radio0.channel=6
+uci -q set wireless.radio0.band=5g
+uci -q set wireless.radio0.channel=149
 uci -q set wireless.radio0.htmode=HT20
-uci -q set wireless.radio1.channel=36
+uci -q set wireless.radio0.disabled=0
+uci -q set wireless.radio1.band=2g
+uci -q set wireless.radio1.channel=6
 uci -q set wireless.radio1.htmode=HT20
+uci -q set wireless.radio2.band=5g
 uci -q set wireless.radio2.channel=48
 uci -q set wireless.radio2.htmode=HT20
 for r in default_radio0 default_radio1 default_radio2; do
@@ -17,7 +30,7 @@ for r in default_radio0 default_radio1 default_radio2; do
 	uci -q set wireless.$r.encryption=none
 	uci -q delete wireless.$r.key
 done
-uci -q set wireless.default_radio0.ssid=OpenWRT-2.4
-uci -q set wireless.default_radio1.ssid=OpenWRT-5-1
-uci -q set wireless.default_radio2.ssid=OpenWRT-5-2
+uci -q set wireless.default_radio0.ssid=OpenWRT-5-2
+uci -q set wireless.default_radio1.ssid=OpenWRT-2.4
+uci -q set wireless.default_radio2.ssid=OpenWRT-5-1
 uci -q commit wireless

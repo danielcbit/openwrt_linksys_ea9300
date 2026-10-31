@@ -58,10 +58,46 @@ scans both slots for OpenWrt's `1-openwrt` bootfs marker and names the
 matching one `firmware` — the device boots OpenWrt from either slot no
 matter what CFE's tracker says.
 
+## WiFi radio mapping (reverse-engineered 2026-10)
+
+All three BCM4366 cores are dual-band capable but each has a band-specific
+RF path, and the devinfo blocks are NOT in Linux PCI order. The stock
+firmware's syscfg (`wl*_mac_addr`, `wl*_available_channels`) is the source
+of truth:
+
+| devinfo block | stock wl | MAC | band | Linux phy |
+|---|---|---|---|---|
+| 1 | wl0 | ...BD | 2.4 GHz (1-11) | phy1 |
+| 2 | wl1 | ...BE | 5 GHz 36-48 | phy2 |
+| 3 | wl2 | ...BF | 5 GHz 149-165 | phy0 |
+
+brcmfmac's v2 NVRAM prefixes are `pcie/<linux-domain+1>/1/`, so the preinit
+hook maps block 3 -> pcie/1/1 (phy0), block 1 -> pcie/2/1 (phy1), block 2 ->
+pcie/3/1 (phy2). Getting this wrong makes radios disappear or transmit into
+the wrong band's filter (observed: -90 dBm instead of -39 dBm).
+
+The high-band radio (phy0, channels 149-165) needs firmware with full
+CLM data: the linux-firmware build (10.28.2) refuses channels >= 149
+(`Set Channel failed ... -52`) regardless of NVRAM ccode/regrev or the host
+country.
+
+- The stock Linksys dhd.ko embeds a 4366c0 firmware (10.10.122.20, 2017)
+  *with* the CLM (`scripts/extract-dhd-firmware.py` can carve it), but it
+  is not usable with brcmfmac 6.x: DHCP replies and other unicast data
+  frames to stations are silently dropped and links flap.
+- `scripts/fetch-wifi-firmware.sh` downloads a hash-pinned 2021 build
+  (10.10.122.303, FWID 01-ccd91e51, from codeberg.org/floe/
+  broadcom-4366c-firmware) that has the CLM and works with brcmfmac 6.x.
+  With it all three radios come up (5-2 on 149, 5-1 on 48, 2.4 on 6) and
+  DHCP/data traffic works on both bands.
+
 ## Known open items
 
-1. **LED GPIOs** — not identified yet (stock bdutil LED module owns them;
-   they are not in devinfo). Extend the DTS once probed.
+1. **LED GPIOs** — rear switch-port LEDs are mapped and implemented in the
+   DTS (LED engine positions 0/2/4/6/10/17/18/19/21/26). Front panel mostly
+   mapped (Internet=GPIO12, WPS=GPIO14, logo=pin15, USB=GPIO22/23); the
+   front Ethernet logo LED is still unmapped. Full details and probing
+   notes in `research/led-map.md`.
 2. **`eth0` MTU** — DSA asks the conduit for 1504 (1500 + overhead) and
    the driver rejects it (`error -22`). Cosmetic; traffic works.
 3. **No CLM blob** — brcmfmac reports "limited channels"; DFS channels
